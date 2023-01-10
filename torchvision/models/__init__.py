@@ -1,4 +1,5 @@
 from .alexnet import *
+from .bgremoval import *
 from .convnext import *
 from .densenet import *
 from .efficientnet import *
