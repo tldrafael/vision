@@ -578,7 +578,7 @@ def maskrcnn_resnet50_fpn_v2(
     )
 
     if weights is not None:
-        model.load_state_dict(weights.get_state_dict(progress=progress))
+        model.load_state_dict(weights.get_state_dict(progress=progress), strict=False)
 
     return model
 

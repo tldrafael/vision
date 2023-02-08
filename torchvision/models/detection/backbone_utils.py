@@ -44,6 +44,7 @@ class BackboneWithFPN(nn.Module):
         if extra_blocks is None:
             extra_blocks = LastLevelMaxPool()
 
+        self.backbone = backbone
         self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
         self.fpn = FeaturePyramidNetwork(
             in_channels_list=in_channels_list,
@@ -55,6 +56,7 @@ class BackboneWithFPN(nn.Module):
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
         x = self.body(x)
+        x.pop('relu')
         x = self.fpn(x)
         return x
 
@@ -139,6 +141,7 @@ def _resnet_fpn_extractor(
     if min(returned_layers) <= 0 or max(returned_layers) >= 5:
         raise ValueError(f"Each returned layer should be in the range [1,4]. Got {returned_layers}")
     return_layers = {f"layer{k}": str(v) for v, k in enumerate(returned_layers)}
+    return_layers = {"relu": 'relu', **return_layers}
 
     in_channels_stage2 = backbone.inplanes // 8
     in_channels_list = [in_channels_stage2 * 2 ** (i - 1) for i in returned_layers]

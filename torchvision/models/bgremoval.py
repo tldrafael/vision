@@ -1,8 +1,13 @@
+from collections import OrderedDict
 import torch
 import torch.nn as nn
+from .detection import MaskRCNN_ResNet50_FPN_V2_Weights
+from .resnet import resnet50
+from ._utils import IntermediateLayerGetter
+from .detection.transform import GeneralizedRCNNTransform
 
 
-__all__ = ['BGRemovalDecoder']
+__all__ = ['BGRemovalDecoder', 'BGRemoval']
 
 
 def conv_block(in_channels, out_channels, ks=3, padding='same'):
@@ -63,4 +68,38 @@ class BGRemovalDecoder(nn.Module):
 class BGRemoval(nn.Module):
     def __init__(self):
         super().__init__()
+        weights = MaskRCNN_ResNet50_FPN_V2_Weights.COCO_V1
+        self.weights = MaskRCNN_ResNet50_FPN_V2_Weights.verify(weights)
 
+        min_size=800,
+        max_size=1333,
+        image_mean = [0.485, 0.456, 0.406]
+        image_std = [0.229, 0.224, 0.225]
+        transform = GeneralizedRCNNTransform(min_size, max_size, image_mean, image_std)
+
+        self.backbone = resnet50(weights=None)
+        self.return_layers = ['relu', 'layer1', 'layer2', 'layer3', 'layer4']
+        self.return_layers = {k:k for k in self.return_layers}
+        self.backbone = IntermediateLayerGetter(self.backbone, return_layers=self.return_layers)
+        self.decoder = BGRemovalDecoder()
+
+        self.load_pretrained_weights()
+
+    def load_pretrained_weights(self):
+        weights = MaskRCNN_ResNet50_FPN_V2_Weights.COCO_V1
+        weights = MaskRCNN_ResNet50_FPN_V2_Weights.verify(weights)
+
+        state_dict = weights.get_state_dict(True)
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            if 'body' in k:
+                new_key = k.replace('body.', '')
+                new_state_dict[new_key] = v
+
+        self.load_state_dict(new_state_dict, strict=False)
+
+    def forward(self, x):
+        x = self.backbone(x)
+        x = list(x.values())
+        x = self.decoder(x)
+        return x
